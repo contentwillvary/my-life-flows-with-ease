@@ -1,0 +1,431 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Money visualisation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600&family=Source+Sans+3:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: settings rail on the left, results on the right; one column on phones. Light-first, sage neutrals. */
+:root{
+  --bg:#f4f6f3; --surface:#ffffff; --surface-2:#eef1ec; --line:#d8ded6; --fg:#1b2420; --muted:#5d6a63;
+  --accent:#1f6f57; --accent-ink:#ffffff;
+  --s-access:#2f8f73; --s-pension:#7461c9; --s-target:#c46a1b;
+  --good:#2f8a4f; --warn:#a96a0c; --bad:#b9433a;
+  --f-display:"Sora", "Source Sans 3", system-ui, sans-serif;
+  --f-body:"Source Sans 3", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-num:"IBM Plex Mono", ui-monospace, Menlo, monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#121815; --surface:#18201c; --surface-2:#1e2823; --line:#2b3731; --fg:#e3ebe6; --muted:#93a39a;
+  --accent:#5cc49d; --accent-ink:#0d1a14;
+  --s-access:#4fbf9b; --s-pension:#a593f0; --s-target:#f0a35e;
+  --good:#6cc28a; --warn:#e6a347; --bad:#ec7a70; color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#121815; --surface:#18201c; --surface-2:#1e2823; --line:#2b3731; --fg:#e3ebe6; --muted:#93a39a;
+  --accent:#5cc49d; --accent-ink:#0d1a14;
+  --s-access:#4fbf9b; --s-pension:#a593f0; --s-target:#f0a35e;
+  --good:#6cc28a; --warn:#e6a347; --bad:#ec7a70; color-scheme:dark }
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.45;margin:0}
+.wrap{max-width:1280px;margin:0 auto;padding-inline:16px;padding-block:20px 48px}
+header.top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:end;gap:10px 20px;margin-bottom:14px}
+h1{font-family:var(--f-display);font-weight:600;font-size:clamp(24px,3vw,32px);margin:0;letter-spacing:-.01em;text-wrap:balance}
+.sub{color:var(--muted);font-size:14px;margin-top:2px;max-width:70ch}
+.note{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 14px;font-size:14px;color:var(--muted);margin-bottom:16px}
+.note b{color:var(--fg)}
+.layout{display:grid;grid-template-columns:minmax(290px,350px) minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:900px){.layout{grid-template-columns:minmax(0,1fr)}}
+.rail{display:flex;flex-direction:column;gap:10px}
+details.grp{background:var(--surface);border:1px solid var(--line);border-radius:12px}
+details.grp>summary{list-style:none;cursor:pointer;padding:11px 14px;display:flex;justify-content:space-between;font-weight:600;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+details.grp>summary::-webkit-details-marker{display:none}
+details.grp>summary::after{content:"+";font-family:var(--f-num)}
+details.grp[open]>summary::after{content:"–"}
+.body{padding:0 14px 14px;display:flex;flex-direction:column;gap:12px}
+.ctl label{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:14px}
+.ctl .hint{color:var(--muted);font-size:12.5px;margin-top:2px}
+.ctl input[type=number],.ctl select,.debt input{font:500 14px var(--f-num);background:var(--surface-2);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:4px 6px}
+.ctl input[type=number]{width:104px;text-align:right}
+.ctl select{font-family:var(--f-body);max-width:200px}
+.ctl input[type=range]{width:100%;accent-color:var(--accent);margin:6px 0 0}
+.ctl.check label{justify-content:flex-start;gap:10px;cursor:pointer}
+.ctl.check input{accent-color:var(--accent);width:18px;height:18px}
+.debts{display:flex;flex-direction:column;gap:8px}
+.debt{display:grid;grid-template-columns:minmax(0,1.4fr) repeat(3,minmax(0,1fr));gap:6px}
+.debt input{width:100%;min-width:0}
+.debt input.name{font-family:var(--f-body)}
+.debthead{display:grid;grid-template-columns:minmax(0,1.4fr) repeat(3,minmax(0,1fr));gap:6px;font-size:12px;color:var(--muted)}
+.main{display:flex;flex-direction:column;gap:16px;min-width:0}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+@media (max-width:1100px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.kpi.lead{border-color:var(--s-target)}
+.kpi.lead .val{color:var(--s-target)}
+.kpi .lab{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.kpi .val{font:500 clamp(20px,2.4vw,26px) var(--f-num);letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.kpi .sm{font-size:12.5px;color:var(--muted)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;min-width:0}
+.panel h2{font-family:var(--f-display);font-weight:500;font-size:18px;margin:0 0 2px}
+.ph{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:8px 16px;margin-bottom:10px}
+.muted{color:var(--muted)} .small{font-size:13px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.legend i.dash{width:16px;height:0;border-top:2.5px dashed var(--s-target);border-radius:0;vertical-align:3px;background:none}
+.chart{position:relative;width:100%}
+.chart svg{display:block;width:100%;height:auto;overflow:visible}
+.chart text{font-family:var(--f-num);font-size:11px;fill:var(--muted)}
+.tip{position:absolute;pointer-events:none;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12.5px;min-width:190px;box-shadow:0 6px 18px rgb(0 0 0 / .18);z-index:3}
+.tip b{font-family:var(--f-display);font-weight:500;display:block;margin-bottom:4px}
+.tip .r{display:flex;justify-content:space-between;gap:14px;font-family:var(--f-num)}
+.two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+@media (max-width:1000px){.two{grid-template-columns:minmax(0,1fr)}}
+.flow{display:flex;flex-direction:column}
+.flow .row{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px dashed var(--line);font-size:14px}
+.flow .row:last-child{border-bottom:0}
+.flow .n{font-family:var(--f-num);font-variant-numeric:tabular-nums;white-space:nowrap}
+.flow .sub .k{padding-left:14px;color:var(--muted)}
+.flow .tot{font-weight:600;border-bottom:1px solid var(--line)}
+.neg{color:var(--bad)} .pos{color:var(--good)}
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:6px 8px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}
+th{font-weight:500;color:var(--muted);font-size:12px;letter-spacing:.04em;text-transform:uppercase}
+th:first-child,td:first-child{text-align:left}
+td{font-family:var(--f-num);font-variant-numeric:tabular-nums}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font-size:13px;border-radius:999px;padding:5px 11px;border:1px solid var(--line);background:var(--surface)}
+.chip.good{border-color:color-mix(in srgb,var(--good) 55%,transparent);color:var(--good)}
+.chip.warn{border-color:color-mix(in srgb,var(--warn) 55%,transparent);color:var(--warn)}
+.chip.bad{border-color:color-mix(in srgb,var(--bad) 55%,transparent);color:var(--bad)}
+.btn{font:600 14px var(--f-body);border-radius:8px;padding:8px 14px;cursor:pointer;border:1px solid var(--line);background:var(--surface-2);color:var(--fg)}
+.btn:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.prose{font-size:14px;max-width:72ch}
+.prose li{margin:3px 0}
+footer{margin-top:24px;color:var(--muted);font-size:12.5px;max-width:90ch}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Money visualisation</h1>
+      <div class="sub" id="sub">Your take-home, your debts, and how secure your future looks: when your savings could cover retirement, a lower income, or all your costs. UK 2026/27 rules, all figures in today's money.</div>
+    </div>
+    <button class="btn" type="button" id="reset">Reset to the example</button>
+  </header>
+  <div class="note" id="example-note"><b>These are example figures:</b> someone employed on £40,000, renting, with a small credit card balance and a Plan 2 student loan. Change anything on the left; your numbers are saved in this browser only, and nobody else can see them.</div>
+
+  <div class="layout">
+    <aside class="rail" id="rail"></aside>
+    <main class="main">
+      <div class="kpis">
+        <div class="kpi lead"><span class="lab">Lower income covered</span><span class="val" id="k-light">–</span><span class="sm" id="k-light-n"></span></div>
+        <div class="kpi"><span class="lab">Retirement covered</span><span class="val" id="k-coast">–</span><span class="sm" id="k-coast-n"></span></div>
+        <div class="kpi"><span class="lab">Financially independent</span><span class="val" id="k-fire">–</span><span class="sm" id="k-fire-n"></span></div>
+        <div class="kpi"><span class="lab">Spare each month</span><span class="val" id="k-spare">–</span><span class="sm" id="k-spare-n"></span></div>
+      </div>
+      <div class="chips" id="flags"></div>
+
+      <div class="panel">
+        <div class="ph">
+          <div><h2>Where your money builds up</h2><div class="muted small">End of each year. Hover or tap a year for detail.</div></div>
+          <div class="legend"><span><i style="background:var(--s-access)"></i>Savings and ISA (reachable any time)</span><span><i style="background:var(--s-pension)"></i>Pension (locked until access age)</span><span><i class="dash"></i>Needed if income were lower</span></div>
+        </div>
+        <div class="chart" id="c-wealth"></div>
+        <ul class="prose muted" id="assume"></ul>
+      </div>
+
+      <div class="two">
+        <div class="panel">
+          <div class="ph"><div><h2>Your take-home</h2><div class="muted small" id="th-sub"></div></div></div>
+          <div class="flow" id="flow"></div>
+        </div>
+        <div class="panel">
+          <div class="ph"><div><h2>Debts</h2><div class="muted small">Paying the amounts you set; freed-up payments go to savings</div></div></div>
+          <div class="tablewrap"><table id="t-debts"></table></div>
+          <p class="small muted" id="debt-note"></p>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="ph"><div><h2>What the three milestones mean</h2></div></div>
+        <p class="prose">Three ways to see how far your savings and investments could carry you. They come from an established planning approach called <b>FIRE (Financial Independence, Retire Early)</b>. Here they're reference points for how secure you are, not a plan or an assumption about how you'll work.</p>
+        <ul class="prose">
+          <li><b>Retirement covered</b> (in FIRE terms, Coast FIRE): what you've built up would grow on its own to fund retirement at the age you plan for, even if you saved nothing more.</li>
+          <li><b>Lower income covered</b> (Barista FIRE): if your take-home dropped to the amount you set (a pay cut, fewer hours, time out for study or caring), your investments would make up the difference.</li>
+          <li><b>Financially independent</b> (Full FIRE): your investments cover all your costs. Money outside your pension carries you to your pension access age; the pension and the State Pension take over after that.</li>
+        </ul>
+      </div>
+    </main>
+  </div>
+  <footer id="foot">A planning aid, not financial advice. Uses 2026/27 rates for England, Wales and Northern Ireland: personal allowance £12,570 (tapered over £100k), income tax 20/40/45%, employee NI 8%/2%, Class 4 NI 6%/2%, dividend tax 10.75/35.75/39.35% with a £500 allowance, corporation tax 19% to £50k (26.5% marginal above), student loan thresholds Plan 1 £26,900, Plan 2 £29,385, Plan 4 £33,795, Plan 5 £25,000 (9%), Postgraduate £21,000 (6%), full State Pension £12,548 from 67. Workplace pensions are modelled on full salary; company director figures assume a £12,570 salary with all remaining profit paid as dividends. Scotland's income tax bands differ. Pay and thresholds are held flat in today's money.</footer>
+</div>
+<div class="tip" id="tip" hidden></div>
+
+<script>
+// ===== Country settings =====
+// Everything country-specific lives here. Outside the UK, change this block (see locales/ in the kit):
+// taxModel:'manual' hides the UK tax maths and people enter their own take-home instead.
+const LOCALE = { lang:'en-GB', currency:'GBP', taxModel:'uk', taxFreeAccount:'an ISA',
+  statePension:12548, statePensionAge:67, pensionAge:{min:55, max:60, d:57, hint:'57 from April 2028'} };
+const UK = LOCALE.taxModel==='uk';
+
+// ===== Tax and projection model (UK 2026/27, today's money) =====
+const T = { pa:12570, basic:37700, addStart:125140, taper:100000, it:[0.2,0.4,0.45],
+  niPT:12570, niUEL:50270, ee:[0.08,0.02], c4:[0.06,0.02], divAllow:500, div:[0.1075,0.3575,0.3935],
+  erNI:0.15, erST:5000, sp:LOCALE.statePension,
+  sl:{ none:[0,0], p1:[26900,0.09], p2:[29385,0.09], p4:[33795,0.09], p5:[25000,0.09], pg:[21000,0.06] } };
+const bandSplit = (start, amt, basic) => { const e=[0,basic,T.addStart,Infinity], o=[0,0,0];
+  for (let i=0;i<3;i++){ const lo=Math.max(start,e[i]), hi=Math.min(start+amt,e[i+1]); if(hi>lo) o[i]=hi-lo; } return o; };
+const paFor = income => Math.max(0, T.pa - Math.max(0,(income - T.taper)/2));
+const incomeTax = (taxable, basic) => { const s=bandSplit(0,taxable,basic); return s[0]*T.it[0]+s[1]*T.it[1]+s[2]*T.it[2]; };
+const studentLoan = (inc, plan) => { const [th,r]=T.sl[plan]||[0,0]; return r*Math.max(0,inc-th); };
+const corpTax = p => p<=0?0 : p<=50000? p*0.19 : p<=250000? 50000*0.19+(p-50000)*0.265 : p*0.25;
+
+// Returns yearly figures for one year of work at the chosen settings
+function takeHome(i){
+  const g=i.income, out={lines:[]};
+  if (i.work==='manual'){
+    out.net=g; out.pension=i.manPension*12;
+    out.lines=[['Take-home (as you entered it)',g,'tot'],['Pension contributions (yours + employer)',out.pension,'sub']];
+  } else if (i.work==='employed'){
+    const ee=g*i.eePct/100, er=g*i.erPct/100;
+    const pa=paFor(g-ee), tax=incomeTax(Math.max(0,g-ee-pa),T.basic);
+    const ni=T.ee[0]*Math.min(Math.max(0,g-T.niPT),T.niUEL-T.niPT)+T.ee[1]*Math.max(0,g-T.niUEL);
+    const sl=studentLoan(g,i.slPlan);
+    out.net=g-ee-tax-ni-sl; out.pension=ee+er;
+    out.lines=[['Salary',g,'tot'],['Your pension ('+i.eePct+'%)',-ee,'sub'],['Income tax',-tax,'sub'],['National Insurance',-ni,'sub'],['Student loan',-sl,'sub'],['Take-home',out.net,'tot'],['Employer adds to your pension ('+i.erPct+'%)',er,'sub']];
+  } else if (i.work==='self'){
+    const net=i.sePension*12, gross=net/0.8;
+    const pa=paFor(g-gross), tax=incomeTax(Math.max(0,g-pa),T.basic+gross);
+    const ni=T.c4[0]*Math.min(Math.max(0,g-T.niPT),T.niUEL-T.niPT)+T.c4[1]*Math.max(0,g-T.niUEL);
+    const sl=studentLoan(g,i.slPlan);
+    out.net=g-tax-ni-sl-net; out.pension=gross;
+    out.lines=[['Profit',g,'tot'],['Income tax',-tax,'sub'],['Class 4 National Insurance',-ni,'sub'],['Student loan',-sl,'sub'],['Your pension payments',-net,'sub'],['Take-home',out.net,'tot'],['Tax relief added to your pension',gross-net,'sub']];
+  } else {
+    const sal=Math.min(12570,Math.max(0,g)), erni=T.erNI*Math.max(0,sal-T.erST), cp=i.coPension*12;
+    const profit=Math.max(0,g-sal-erni-cp), ct=corpTax(profit), D=profit-ct;
+    const pa=paFor(sal+D), nsTaxable=Math.max(0,sal-pa), paLeft=Math.max(0,pa-sal), divTaxable=Math.max(0,D-paLeft);
+    const all=bandSplit(nsTaxable,divTaxable,T.basic), free=bandSplit(nsTaxable,Math.min(T.divAllow,divTaxable),T.basic);
+    let dt=0; for(let k=0;k<3;k++) dt+=(all[k]-free[k])*T.div[k];
+    const it=incomeTax(nsTaxable,T.basic);
+    const sl=studentLoan(sal+(D>2000?D:0),i.slPlan);
+    out.net=sal+D-dt-it-sl; out.pension=cp;
+    out.lines=[['Company profit before your pay',g,'tot'],['Your salary',-sal,'sub'],['Employer NI',-erni,'sub'],['Company pension',-cp,'sub'],['Corporation tax',-ct,'sub'],['Dividends paid to you',D,'tot'],['Dividend tax',-dt,'sub'],['Student loan',-sl,'sub'],['Take-home (salary + dividends)',out.net,'tot']];
+  }
+  return out;
+}
+
+function debtPlan(debts){
+  return debts.filter(d=>d.bal>0).map(d=>{
+    let b=d.bal, m=0, interest=0; const q=d.apr/1200;
+    while(b>0.5 && m<600){ const int=b*q; if(d.pay<=int){ m=Infinity; break; } interest+=int; b=b+int-d.pay; m++; }
+    return {...d, months:m, interest};
+  });
+}
+
+function project(i, horizon=35){
+  const r=i.ret/100, th=takeHome(i), rows=[];
+  const spendY=(i.essentials+i.joy)*12;
+  const mortY=k => i.housing==='mortgage' && k < i.mortYears ? i.mortPay*12 : 0;
+  const plan=debtPlan(i.debts);
+  // monthly debt simulation by year
+  const dState=plan.map(d=>({bal:d.bal,apr:d.apr,pay:d.pay}));
+  let cash=i.sCash, isa=i.sIsa, pen=i.sPension;
+  const base=Math.max(0,i.fireSpend*12);
+  const spAdj=k => i.statePension ? T.sp/(i.swr/100)*Math.pow(1+r,-(LOCALE.statePensionAge-i.pensionAge)) : 0;
+  const pvSpend=(t,n)=>{ let v=0; for(let k=0;k<n;k++) v+=(base+mortY(t+k))/Math.pow(1+r,k); return v; };
+  const pvLight=(t,a,n)=>{ let v=0; for(let k=0;k<n;k++) v+=Math.max(0,base+mortY(t+k)-(a+k<i.lightUntil?i.lightPay*12:0))/Math.pow(1+r,k); return v; };
+  const pensionNeedAt=tA=>{ let m=0; for(let k=0;k<60;k++) m+=mortY(tA+k)/Math.pow(1+r,k); return Math.max(0, base/(i.swr/100)-spAdj()+m); };
+  let fire=null, light=null, coast=null;
+  for(let y=0;y<horizon;y++){
+    let debtPaid=0;
+    for(const d of dState){ for(let mth=0;mth<12;mth++){ if(d.bal<=0) break; const int=d.bal*d.apr/1200; const p=Math.min(d.pay,d.bal+int); d.bal=d.bal+int-p; debtPaid+=p; } }
+    const surplus=th.net-spendY-mortY(y)-debtPaid;
+    const efTarget=i.efMonths*(i.essentials+(i.housing==='mortgage'?i.mortPay:0));
+    isa*=1+r; pen=pen*(1+r)+th.pension;
+    if(surplus>=0){ const toCash=Math.min(surplus,Math.max(0,efTarget-cash)); cash+=toCash; isa+=surplus-toCash; }
+    else { let need=-surplus; const fromCash=Math.min(need,cash); cash-=fromCash; need-=fromCash; isa-=need; }
+    const age=i.age+y+1, debtLeft=dState.reduce((s,d)=>s+Math.max(0,d.bal),0);
+    const accessible=cash+isa-debtLeft;
+    const bridgeYears=Math.max(0,i.pensionAge-age);
+    const pensionNeed=pensionNeedAt(y+1+bridgeYears), pCoast=pensionNeed/Math.pow(1+r,bridgeYears);
+    const bridge=pvSpend(y+1,bridgeYears);
+    const isFire= accessible>=bridge && accessible+pen>=bridge+pCoast;
+    const lb=pvLight(y+1,age,bridgeYears);
+    let paySaved=0; const aA=age+bridgeYears, tA=y+1+bridgeYears;
+    for(let k=0;aA+k<i.lightUntil;k++) paySaved+=Math.min(i.lightPay*12,base+mortY(tA+k))/Math.pow(1+r,k);
+    const lightLater=Math.max(0,pensionNeed-paySaved)/Math.pow(1+r,bridgeYears);
+    const isLight= accessible>=lb && accessible+pen>=lb+lightLater;
+    const R=Math.max(age,Math.min(i.coastAge,i.pensionAge)), bc=pvSpend(y+1+(R-age),Math.max(0,i.pensionAge-R))/Math.pow(1+r,R-age);
+    const isCoast= accessible>=bc && accessible+pen>=bc+pCoast;
+    if(isFire&&fire===null) fire=y; if(isLight&&light===null) light=y; if(isCoast&&coast===null) coast=y;
+    rows.push({y,age,cash,isa,pen,debtLeft,accessible,total:accessible+pen,surplus,lightTarget:lb+lightLater,isLight,isFire,isCoast});
+  }
+  return {rows,fire,light,coast,th,plan,spendY};
+}
+
+// ===== UI =====
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const CUR=new Intl.NumberFormat(LOCALE.lang,{style:'currency',currency:LOCALE.currency}).formatToParts(0).find(p=>p.type==='currency').value;
+const gbp=v=>(v<0?'−':'')+CUR+Math.round(Math.abs(v)).toLocaleString(LOCALE.lang);
+const gbpK=v=>{const a=Math.abs(v),s=v<0?'−':''; if(a>=1e6) return s+CUR+(a/1e6).toFixed(2)+'m'; if(a>=1e4) return s+CUR+Math.round(a/1e3)+'k'; if(a>=1e3) return s+CUR+(a/1e3).toFixed(1)+'k'; return s+CUR+Math.round(a);};
+const yearOf=y=>new Date().getFullYear()+y+1;
+
+const GROUPS=[
+ {t:'You and your work',open:true,items:[
+  {k:'work',l:'How you earn',type:'select',opts:(UK?[['employed','Employed (PAYE)'],['self','Self-employed'],['ltd','Limited company director']]:[]).concat([['manual',"I'll enter my take-home myself"]]),d:UK?'employed':'manual'},
+  {k:'income',l:'Yearly income',min:0,max:200000,step:500,d:40000,h:'Employed: salary. Self-employed: profit. Company director: company profit before your pay. Entering it yourself: your yearly pay after tax'},
+  {k:'manPension',l:'Pension contributions /month (yours + employer)',min:0,max:5000,step:25,d:300,show:i=>i.work==='manual'},
+  {k:'slPlan',l:'Student loan',type:'select',opts:[['none','None'],['p1','Plan 1'],['p2','Plan 2'],['p4','Plan 4 (Scotland)'],['p5','Plan 5'],['pg','Postgraduate']],d:UK?'p2':'none',show:i=>i.work!=='manual'},
+  {k:'eePct',l:'Your workplace pension %',min:0,max:40,step:0.5,d:5,f:'%',show:i=>i.work==='employed'},
+  {k:'erPct',l:'Employer pension %',min:0,max:20,step:0.5,d:3,f:'%',show:i=>i.work==='employed',h:'Often 3%; some employers match more if you pay more'},
+  {k:'sePension',l:'Personal pension /month',min:0,max:3000,step:25,d:150,show:i=>i.work==='self',h:'What you pay; 25% tax relief is added on top'},
+  {k:'coPension',l:'Company pension /month',min:0,max:5000,step:50,d:500,show:i=>i.work==='ltd',h:'Paid by the company before corporation tax'},
+ ]},
+ {t:'Spending and home',open:true,items:[
+  {k:'essentials',l:'Essentials /month',min:0,max:8000,step:25,d:1800,h:'Rent or bills, food, transport, insurance (not the mortgage, that goes below)'},
+  {k:'joy',l:'Joy /month',min:0,max:5000,step:25,d:300,h:'Eating out, trips, hobbies, gifts'},
+  {k:'housing',l:'Home',type:'select',opts:[['rent','Renting or living with family'],['mortgage','Own with a mortgage']],d:'rent'},
+  {k:'mortPay',l:'Mortgage payment /month',min:0,max:8000,step:25,d:1200,show:i=>i.housing==='mortgage'},
+  {k:'mortYears',l:'Years left on the mortgage',min:0,max:40,step:1,d:25,f:'n',show:i=>i.housing==='mortgage'},
+ ]},
+ {t:'Debts',open:true,items:[{k:'debts',type:'debts'}]},
+ {t:'What you have now',open:false,items:[
+  {k:'sCash',l:'Cash savings',min:0,max:200000,step:100,d:3000},
+  {k:'sIsa',l:'ISAs and other investments',min:0,max:500000,step:100,d:1000},
+  {k:'sPension',l:'Pensions (all pots)',min:0,max:500000,step:100,d:8000},
+  {k:'efMonths',l:'Emergency fund target (months of essentials)',min:0,max:12,step:1,d:3,f:'n',h:'Spare money fills this first, then goes into an ISA'},
+ ]},
+ {t:'Goals and assumptions',open:false,items:[
+  {k:'age',l:'Your age now',min:16,max:70,step:1,d:30,f:'n'},
+  {k:'fireSpend',l:'Spending in retirement, excl. mortgage /month',min:0,max:10000,step:50,d:2100,h:'Mortgage payments are added on top until it ends'},
+  {k:'lightPay',l:'Lower income to test: take-home /month',min:0,max:6000,step:50,d:1200,h:'A lower take-home to plan for, e.g. if your pay or hours changed'},
+  {k:'lightUntil',l:'Lower income until age',min:30,max:75,step:1,d:60,f:'n'},
+  {k:'coastAge',l:'Retirement age to plan for',min:35,max:70,step:1,d:60,f:'n',h:'Used for Retirement covered'},
+  {k:'pensionAge',l:'Pension access age',min:LOCALE.pensionAge.min,max:LOCALE.pensionAge.max,step:1,d:LOCALE.pensionAge.d,f:'n',h:LOCALE.pensionAge.hint},
+  {k:'ret',l:'Investment growth after inflation',min:0,max:8,step:0.25,d:5,f:'%'},
+  {k:'swr',l:'Safe withdrawal rate',min:2.5,max:5,step:0.1,d:4,f:'%'},
+  {k:'statePension',l:`Count the full State Pension from ${LOCALE.statePensionAge}`,type:'check',d:true},
+ ]},
+];
+const DEF_DEBTS=[{name:'Credit card',bal:1200,apr:24,pay:180},{name:'',bal:0,apr:0,pay:0},{name:'',bal:0,apr:0,pay:0}];
+const ALL=GROUPS.flatMap(g=>g.items).filter(i=>i.type!=='debts');
+const DEFAULTS=Object.assign(Object.fromEntries(ALL.map(i=>[i.k,i.d])),{debts:DEF_DEBTS});
+const LS='uplift.planner.v1';
+let inp=JSON.parse(JSON.stringify(DEFAULTS)), edited=false;
+try{ const s=JSON.parse(localStorage.getItem(LS)||'null'); if(s){ inp={...inp,...s.inp}; edited=!!s.edited; } }catch(e){}
+const fmt=(it,v)=>it.f==='%'?(+v)+'%':it.f==='n'?String(v):gbp(v);
+
+function buildRail(){
+  $('#rail').innerHTML=GROUPS.map((g,gi)=>`<details class="grp" ${g.open?'open':''}><summary>${esc(g.t)}</summary><div class="body">${g.items.map(it=>{
+    if(it.type==='debts') return `<div class="debthead"><span>Debt</span><span>Balance</span><span>APR %</span><span>Pay /mo</span></div><div class="debts">${[0,1,2].map(n=>`<div class="debt">
+      <input class="name" id="d${n}-name" data-d="${n}" data-f="name" type="text" placeholder="e.g. Car finance" aria-label="Debt ${n+1} name">
+      <input id="d${n}-bal" data-d="${n}" data-f="bal" type="number" min="0" step="50" inputmode="decimal" aria-label="Debt ${n+1} balance">
+      <input id="d${n}-apr" data-d="${n}" data-f="apr" type="number" min="0" step="0.1" inputmode="decimal" aria-label="Debt ${n+1} interest rate">
+      <input id="d${n}-pay" data-d="${n}" data-f="pay" type="number" min="0" step="5" inputmode="decimal" aria-label="Debt ${n+1} monthly payment"></div>`).join('')}</div><div class="hint muted small">Leave the student loan out: it's taken from pay above.</div>`;
+    if(it.type==='select') return `<div class="ctl" data-wrap="${it.k}"><label for="i-${it.k}"><span>${esc(it.l)}</span><select id="i-${it.k}" data-k="${it.k}">${it.opts.map(([v,l])=>`<option value="${v}">${esc(l)}</option>`).join('')}</select></label></div>`;
+    if(it.type==='check') return `<div class="ctl check" data-wrap="${it.k}"><label for="i-${it.k}"><input type="checkbox" id="i-${it.k}" data-k="${it.k}"> ${esc(it.l)}</label></div>`;
+    return `<div class="ctl" data-wrap="${it.k}"><label for="n-${it.k}"><span>${esc(it.l)}</span><input type="number" id="n-${it.k}" data-k="${it.k}" min="${it.min}" step="${it.step}" inputmode="decimal"></label><input type="range" id="i-${it.k}" data-k="${it.k}" min="${it.min}" max="${it.max}" step="${it.step}" aria-label="${esc(it.l)}">${it.h?`<div class="hint">${esc(it.h)}</div>`:''}</div>`;
+  }).join('')}</div></details>`).join('');
+  sync();
+}
+function sync(){
+  for(const it of ALL){
+    const w=document.querySelector(`[data-wrap="${it.k}"]`); if(w) w.hidden=!!(it.show&&!it.show(inp));
+    if(it.type==='select'){ $('#i-'+it.k).value=inp[it.k]; continue; }
+    if(it.type==='check'){ $('#i-'+it.k).checked=!!inp[it.k]; continue; }
+    $('#i-'+it.k).value=inp[it.k]; const n=$('#n-'+it.k); if(document.activeElement!==n) n.value=inp[it.k];
+  }
+  inp.debts.forEach((d,n)=>['name','bal','apr','pay'].forEach(f=>{ const el=$(`#d${n}-${f}`); if(el && document.activeElement!==el) el.value= f==='name'? d.name : (d[f]||''); }));
+}
+document.addEventListener('input',e=>{
+  const t=e.target;
+  if(t.dataset.d!==undefined){ const d=inp.debts[+t.dataset.d], f=t.dataset.f; d[f]= f==='name'? t.value : Math.max(0,parseFloat(t.value)||0); return changed(); }
+  const k=t.dataset.k; if(!k) return; const it=ALL.find(i=>i.k===k);
+  if(it.type==='check') inp[k]=t.checked; else if(it.type==='select') inp[k]=t.value;
+  else { const v=parseFloat(t.value); if(!isFinite(v)) return; inp[k]=Math.max(it.min,v); }
+  if(it.type!=='check'&&it.type!=='select'){ if(t.type==='range') $('#n-'+k).value=inp[k]; else $('#i-'+k).value=inp[k]; }
+  if(it.type==='select') sync();
+  changed();
+});
+document.addEventListener('change',e=>{ if(e.target.dataset&&(e.target.dataset.k||e.target.dataset.d!==undefined)) changed(); });
+$('#reset').addEventListener('click',()=>{ inp=JSON.parse(JSON.stringify(DEFAULTS)); edited=false; sync(); changed(true); });
+let raf=0;
+function changed(isReset){
+  if(!isReset) edited=true;
+  try{ localStorage.setItem(LS,JSON.stringify({inp,edited})); }catch(e){}
+  cancelAnimationFrame(raf); raf=requestAnimationFrame(render);
+}
+
+// ===== chart =====
+function niceStep(span,n){ const raw=span/n, p=Math.pow(10,Math.floor(Math.log10(raw||1))), f=raw/p; return (f<1.5?1:f<3?2:f<7?5:10)*p; }
+function drawWealth(pr){
+  const el=$('#c-wealth'), W=Math.max(320,el.clientWidth||700), H=W<520?250:310, m={l:54,r:14,t:16,b:28};
+  const rows=pr.rows.slice(0,30);
+  const pts=[{x:-1,a:Math.max(0,inp.sCash+inp.sIsa-inp.debts.reduce((s,d)=>s+d.bal,0)),p:inp.sPension,t:null},...rows.map((r,i)=>({x:i,a:Math.max(0,r.accessible),p:r.pen,t:r.lightTarget}))];
+  const vals=pts.flatMap(p=>[p.a+p.p]);
+  const cap=Math.max(...vals)*1.6;
+  const tgt=pts.map(p=>p.t!=null&&p.t<=cap?p.t:null);
+  let y1=Math.max(...vals,...tgt.filter(v=>v!=null),1); const st=niceStep(y1,4); y1=Math.ceil(y1/st)*st;
+  const X=x=>m.l+(x+1)/(rows.length)*(W-m.l-m.r), Y=v=>m.t+(1-v/y1)*(H-m.t-m.b);
+  let g='';
+  for(let v=0;v<=y1+1e-6;v+=st) g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)" ${v?'stroke-dasharray="2 4"':''}/><text x="${m.l-8}" y="${Y(v)+4}" text-anchor="end">${gbpK(v)}</text>`;
+  const every=W<520?10:5;
+  pts.forEach((p,i)=>{ if(i===0||i%every===0) g+=`<text x="${X(p.x)}" y="${H-8}" text-anchor="middle">${i===0?'Now':'age '+rows[i-1].age}</text>`; });
+  const area=(top,bot,c)=>{ const a=top.map((v,i)=>(i?'L':'M')+X(pts[i].x).toFixed(1)+','+Y(v).toFixed(1)).join(''); const b=bot.slice().reverse().map((v,j)=>'L'+X(pts[bot.length-1-j].x).toFixed(1)+','+Y(v).toFixed(1)).join(''); return `<path d="${a}${b}Z" fill="${c}" fill-opacity=".6"/><path d="${a}" fill="none" stroke="${c}" stroke-width="2"/>`; };
+  const A=pts.map(p=>p.a), AP=pts.map(p=>p.a+p.p), Z=pts.map(()=>0);
+  g+=area(A,Z,'var(--s-access)')+area(AP,A,'var(--s-pension)');
+  let d=''; tgt.forEach((v,i)=>{ if(v==null) return; d+=(d?'L':'M')+X(pts[i].x).toFixed(1)+','+Y(v).toFixed(1); });
+  if(d) g+=`<path d="${d}" fill="none" stroke="var(--s-target)" stroke-width="2.5" stroke-dasharray="6 4"/>`;
+  const mk=[[pr.coast,'Retirement covered','var(--muted)'],[pr.light,'Lower income covered','var(--s-target)'],[pr.fire,'Independent','var(--good)']].filter(z=>z[0]!==null&&z[0]<rows.length);
+  mk.forEach(([x,l,c],k)=>{ const right=X(x)>W*0.7; g+=`<line x1="${X(x)}" x2="${X(x)}" y1="${m.t}" y2="${H-m.b}" stroke="${c}" stroke-dasharray="4 3"/><text x="${right?X(x)-5:X(x)+5}" y="${m.t+12+k*14}" text-anchor="${right?'end':'start'}" style="fill:${c}">${l}</text>`; });
+  g+=`<line class="hov" x1="0" x2="0" y1="${m.t}" y2="${H-m.b}" stroke="var(--muted)" visibility="hidden"/>`;
+  el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Projected savings, ISA and pension by year">${g}<rect class="hit" x="${m.l}" y="${m.t}" width="${W-m.l-m.r}" height="${H-m.t-m.b}" fill="transparent"/></svg>`;
+  const svg=el.querySelector('svg'), hov=svg.querySelector('.hov'), hit=svg.querySelector('.hit'), tip=$('#tip');
+  const move=ev=>{ const r=svg.getBoundingClientRect(), sx=(ev.clientX-r.left)*W/r.width; let b=0; pts.forEach((p,i)=>{ if(Math.abs(X(p.x)-sx)<Math.abs(X(pts[b].x)-sx)) b=i; });
+    hov.setAttribute('x1',X(pts[b].x)); hov.setAttribute('x2',X(pts[b].x)); hov.setAttribute('visibility','visible');
+    const p=pts[b], rr=b?rows[b-1]:null;
+    tip.innerHTML=`<b>${b?'End of '+yearOf(b-1)+' · age '+rr.age:'Today'}</b>`+[['Savings and ISA',gbpK(p.a)],['Pension',gbpK(p.p)],['Total',gbpK(p.a+p.p)]].concat(rr?[['Lower-income need',gbpK(rr.lightTarget)]]:[]).map(([k,v])=>`<div class="r"><span>${k}</span><span>${v}</span></div>`).join('');
+    tip.hidden=false; const er=el.getBoundingClientRect(); let left=er.left+window.scrollX+X(p.x)*r.width/W+14; if(left+tip.offsetWidth>window.scrollX+document.documentElement.clientWidth-8) left-=tip.offsetWidth+28; tip.style.left=Math.max(8,left)+'px'; tip.style.top=(er.top+window.scrollY+10)+'px'; };
+  hit.addEventListener('pointermove',move); hit.addEventListener('pointerdown',move); hit.addEventListener('pointerleave',()=>{ tip.hidden=true; hov.setAttribute('visibility','hidden'); });
+}
+
+function label(pr,k){ const y=pr[k]; if(y===null) return ['Not within 35 years','Try spending less, saving more or a later age']; const r=pr.rows[y]; return ['Age '+r.age, 'End of '+yearOf(y)+' · '+(y+1)+' year'+(y?'s':'')+' from now']; }
+function render(){
+  $('#example-note').hidden=edited;
+  const pr=project(inp), th=pr.th;
+  const [lv,ln]=label(pr,'light'); $('#k-light').textContent=lv; $('#k-light-n').textContent=pr.light===null?ln:ln+` · on ${gbp(inp.lightPay)}/mo`;
+  const [cv,cn]=label(pr,'coast'); $('#k-coast').textContent=cv; $('#k-coast-n').textContent=pr.coast===null?cn:(pr.rows[pr.coast].age>inp.coastAge?cn+` · after your planned age of ${inp.coastAge}`:cn+` · retire at ${inp.coastAge}`);
+  const [fv,fn]=label(pr,'fire'); $('#k-fire').textContent=fv; $('#k-fire-n').textContent=fn;
+  const debtPay=inp.debts.reduce((s,d)=>s+(d.bal>0?d.pay:0),0);
+  const spare=th.net/12-inp.essentials-inp.joy-(inp.housing==='mortgage'?inp.mortPay:0)-debtPay;
+  $('#k-spare').textContent=gbp(spare); $('#k-spare').className='val '+(spare<0?'neg':''); $('#k-spare-n').textContent=`after spending${debtPay?` and ${gbp(debtPay)} of debt payments`:''}`;
+  // flags
+  const fl=[];
+  if(spare<0) fl.push(['bad',`Spending is ${gbp(-spare)} a month more than take-home: savings run down.`]);
+  const plan=pr.plan; const stuck=plan.find(d=>d.months===Infinity); if(stuck) fl.push(['bad',`${stuck.name||'A debt'}: the payment doesn't cover the interest, so it never clears.`]);
+  const hi=plan.filter(d=>d.apr>=15&&d.months!==Infinity); if(hi.length) fl.push(['warn',`High-interest debt clears in ${Math.max(...hi.map(d=>d.months))} months; clearing it first is a guaranteed return of ${Math.max(...hi.map(d=>d.apr))}%.`]);
+  const ef=inp.efMonths*(inp.essentials+(inp.housing==='mortgage'?inp.mortPay:0)); if(inp.sCash<ef) fl.push(['warn',`Emergency fund: ${gbp(inp.sCash)} of a ${gbp(ef)} target.`]); else fl.push(['good',`Emergency fund in place: ${gbp(inp.sCash)}.`]);
+  if(inp.work==='employed'&&inp.erPct>0) fl.push(['good',`Your employer adds ${gbp(inp.income*inp.erPct/100)} a year to your pension.`]);
+  $('#flags').innerHTML=fl.map(([k,t])=>`<span class="chip ${k}">${esc(t)}</span>`).join('');
+  // take-home
+  $('#th-sub').textContent=`${gbp(th.net/12)} a month · ${({employed:'employed, 2026/27',self:'self-employed, 2026/27',ltd:'company director, 2026/27',manual:'as you entered it'})[inp.work]}`;
+  $('#flow').innerHTML=th.lines.map(([k,v,c])=>`<div class="row ${c}"><span class="k">${esc(k)}</span><span class="n ${v<0?'neg':''}">${gbp(v)}</span></div>`).join('');
+  // debts
+  $('#t-debts').innerHTML=plan.length?`<thead><tr><th>Debt</th><th>Balance</th><th>APR</th><th>Clear in</th><th>Interest</th></tr></thead><tbody>`+plan.map(d=>`<tr><td style="font-family:var(--f-body)">${esc(d.name||'Debt')}</td><td>${gbp(d.bal)}</td><td>${d.apr}%</td><td class="${d.months===Infinity?'neg':''}">${d.months===Infinity?'never':d.months+' mo'}</td><td>${d.months===Infinity?'–':gbp(d.interest)}</td></tr>`).join('')+'</tbody>':'<tbody><tr><td class="muted" style="font-family:var(--f-body)">No debts entered. Add any on the left.</td></tr></tbody>';
+  $('#debt-note').textContent=plan.length?'Paying extra on the highest rate first saves the most interest.':'';
+  drawWealth(pr);
+  $('#assume').innerHTML=`<li>Spare money fills the emergency fund (${inp.efMonths} months of essentials) first, then goes into ${LOCALE.taxFreeAccount}. Pension contributions continue as set.</li><li>In retirement, you live on ${gbp(inp.fireSpend)}/month${inp.housing==='mortgage'?' plus the mortgage until it ends':''}. Savings and investments carry you to ${inp.pensionAge}; the pension${inp.statePension?` and State Pension (from ${LOCALE.statePensionAge})`:''} take over after.</li><li>Growth ${inp.ret}% a year after inflation; you draw ${inp.swr}% a year in retirement. Pay is held flat in today's money.</li>`;
+}
+let rw=0; new ResizeObserver(()=>{ clearTimeout(rw); rw=setTimeout(render,120); }).observe(document.querySelector('.main'));
+if(!UK){
+  $("#sub").textContent="Your take-home, your debts, and how secure your future looks: when your savings could cover retirement, a lower income, or all your costs. All figures in today's money.";
+  $("#example-note").innerHTML="<b>These are example figures.</b> Change anything on the left; your numbers are saved in this browser only, and nobody else can see them.";
+  $("#foot").textContent="A planning aid, not financial advice. Take-home and pension contributions are as you enter them. Pay and thresholds are held flat in today's money.";
+}
+buildRail(); render();
+</script>
+
+</body></html>

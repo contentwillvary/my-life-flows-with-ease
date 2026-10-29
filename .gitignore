@@ -1,0 +1,5 @@
+# Your personal details live here, never in the repo
+my-setup.md
+.DS_Store
+my-docs/
+.claude/
